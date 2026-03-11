@@ -8,7 +8,7 @@ pipeline {
         IMAGE_NAME = "devops-build"
 
         EC2_USER = "ubuntu"
-        EC2_IP   = "13.204.79.117"
+        EC2_IP   = "13.234.17.78"
 
         GIT_REPO = "https://github.com/Sathyaseelan95/devops-build.git"
     }
@@ -24,6 +24,18 @@ pipeline {
         stage('Build Docker Image') {
             steps {
                 sh "docker build -t ${IMAGE_NAME}:${BUILD_NUMBER} ."
+            }
+        }
+
+        stage('Docker Login') {
+            steps {
+                withCredentials([usernamePassword(
+                    credentialsId: 'sathya',
+                    usernameVariable: 'DOCKER_USERNAME',
+                    passwordVariable: 'DOCKER_PASSWORD'
+                )]) {
+                    sh "echo $DOCKER_PASSWORD | docker login -u $DOCKER_USERNAME --password-stdin"
+                }
             }
         }
 
@@ -53,19 +65,13 @@ pipeline {
 
         stage('Deploy to EC2') {
             steps {
-
                 sh """
                 ssh -o StrictHostKeyChecking=no ${EC2_USER}@${EC2_IP} '
                     cd /home/${EC2_USER}
-
                     rm -rf deploy-temp
-
                     git clone -b ${BRANCH_NAME} ${GIT_REPO} deploy-temp
-
                     cd deploy-temp
-
                     chmod +x deploy.sh
-
                     ./deploy.sh
                 '
                 """
