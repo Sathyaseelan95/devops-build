@@ -1,7 +1,8 @@
+version: "3.8"
+
 services:
   devops-app:
-    build: .
-    image: devops-build:latest
+    image: sathyaseelans/dev:${BUILD_NUMBER}
     container_name: devops-app
     ports:
       - "80:80"
