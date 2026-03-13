@@ -23,60 +23,54 @@ pipeline {
 
         stage('Build Docker Image') {
             steps {
-                sh "docker build -t ${IMAGE_NAME}:${BUILD_NUMBER} ."
+                script {
+                    BRANCH = env.BRANCH_NAME
+                    IMAGE_TAG = (BRANCH == 'master') ? 'prod' : (BRANCH == 'dev') ? 'dev' : 'latest'
+                }
+                sh "docker build -t ${DOCKER_USER}/${IMAGE_NAME}:${IMAGE_TAG} ."
             }
         }
 
-        stage('Docker Login') {
+        stage('Docker Login & Push') {
             steps {
                 withCredentials([usernamePassword(
-                    credentialsId: 'sathya',
-                    usernameVariable: 'DOCKER_USERNAME',
+                    credentialsId: 'sathya', 
+                    usernameVariable: 'DOCKER_USERNAME', 
                     passwordVariable: 'DOCKER_PASSWORD'
                 )]) {
                     sh "echo $DOCKER_PASSWORD | docker login -u $DOCKER_USERNAME --password-stdin"
+
+                    script {
+                        // Push based on branch
+                        if (env.BRANCH_NAME == 'dev') {
+                            sh """
+                                docker tag ${DOCKER_USER}/${IMAGE_NAME}:${IMAGE_TAG} ${DOCKER_USER}/${DEV_REPO}:${IMAGE_TAG}
+                                docker push ${DOCKER_USER}/${DEV_REPO}:${IMAGE_TAG}
+                            """
+                        } else if (env.BRANCH_NAME == 'master') {
+                            sh """
+                                docker tag ${DOCKER_USER}/${IMAGE_NAME}:${IMAGE_TAG} ${DOCKER_USER}/${PROD_REPO}:${IMAGE_TAG}
+                                docker push ${DOCKER_USER}/${PROD_REPO}:${IMAGE_TAG}
+                            """
+                        }
+                    }
                 }
-            }
-        }
-
-        stage('Push Dev Image') {
-            when {
-                branch 'dev'
-            }
-            steps {
-                sh """
-                docker tag ${IMAGE_NAME}:${BUILD_NUMBER} ${DOCKER_USER}/${DEV_REPO}:${BUILD_NUMBER}
-                docker push ${DOCKER_USER}/${DEV_REPO}:${BUILD_NUMBER}
-                """
-            }
-        }
-
-        stage('Push Prod Image') {
-            when {
-                branch 'master'
-            }
-            steps {
-                sh """
-                docker tag ${IMAGE_NAME}:${BUILD_NUMBER} ${DOCKER_USER}/${PROD_REPO}:${BUILD_NUMBER}
-                docker push ${DOCKER_USER}/${PROD_REPO}:${BUILD_NUMBER}
-                """
             }
         }
 
         stage('Deploy to EC2') {
             steps {
-                sh """
-                ssh -o StrictHostKeyChecking=no ${EC2_USER}@${EC2_IP} '
-                    cd /home/${EC2_USER}
-                    rm -rf deploy-temp
-                    git clone -b ${BRANCH_NAME} ${GIT_REPO} deploy-temp
-                    cd deploy-temp
-                    chmod +x deploy.sh
-                    ./deploy.sh
-                '
-                """
+                // Use SSH credentials stored in Jenkins (SSH key)
+                sshagent(['ubuntu']) { 
+                    sh """
+                    ssh -o StrictHostKeyChecking=no ${EC2_USER}@${EC2_IP} '
+                        cd /home/${EC2_USER}
+                        ./deploy.sh ${BRANCH}
+                    '
+                    """
+                }
             }
         }
-
     }
 }
+
