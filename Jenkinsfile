@@ -8,7 +8,7 @@ pipeline {
         IMAGE_NAME = "devops-build"
 
         EC2_USER = "ubuntu"
-        EC2_IP   = "13.234.17.78"
+        EC2_IP   = "13.233.117.152"
 
         GIT_REPO = "https://github.com/Sathyaseelan95/devops-build.git"
     }
