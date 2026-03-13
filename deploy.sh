@@ -1,28 +1,24 @@
 #!/bin/bash
-set -e
 
-BRANCH_NAME=$1
-DOCKER_USER=sathyaseelans
-IMAGE_NAME=devops-build
+TAG=$1
 
-if [ "$BRANCH_NAME" == "dev" ]; then
-    TAG=dev
-elif [ "$BRANCH_NAME" == "master" ]; then
-    TAG=prod
+DOCKER_USER="sathyaseelans"
+
+if [ "$TAG" = "dev" ]; then
+    IMAGE="$DOCKER_USER/dev:dev"
 else
-    TAG=latest
+    IMAGE="$DOCKER_USER/prod:prod"
 fi
 
-CONTAINER_NAME=devops-app
+echo "Pulling Docker image: $IMAGE"
 
-echo "Pulling Docker image: $DOCKER_USER/$IMAGE_NAME:$TAG"
-docker pull $DOCKER_USER/$IMAGE_NAME:$TAG
+docker pull $IMAGE
 
-echo "Stopping old container if exists..."
-docker stop $CONTAINER_NAME || true
-docker rm $CONTAINER_NAME || true
+echo "Stopping old container..."
 
-echo "Starting container..."
-docker run -d -p 80:80 --restart always --name $CONTAINER_NAME $DOCKER_USER/$IMAGE_NAME:$TAG
+docker stop devops-app || true
+docker rm devops-app || true
 
-echo "Deployment completed for branch $BRANCH_NAME"
+echo "Running container..."
+
+docker run -d -p 80:80 --name devops-app $IMAGE

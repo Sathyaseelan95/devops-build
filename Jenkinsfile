@@ -3,14 +3,14 @@ pipeline {
 
     environment {
         DOCKER_USER = "sathyaseelans"
-        DEV_REPO = "dev"
+
+        DEV_REPO  = "dev"
         PROD_REPO = "prod"
+
         IMAGE_NAME = "devops-build"
 
         EC2_USER = "ubuntu"
         EC2_IP   = "13.233.117.152"
-
-        GIT_REPO = "https://github.com/Sathyaseelan95/devops-build.git"
     }
 
     stages {
@@ -21,51 +21,70 @@ pipeline {
             }
         }
 
-        stage('Build Docker Image') {
+        stage('Set Image Tag') {
             steps {
                 script {
-                    BRANCH = env.BRANCH_NAME
-                    IMAGE_TAG = (BRANCH == 'master') ? 'prod' : (BRANCH == 'dev') ? 'dev' : 'latest'
-                }
-                sh "docker build -t ${DOCKER_USER}/${IMAGE_NAME}:${IMAGE_TAG} ."
-            }
-        }
-
-        stage('Docker Login & Push') {
-            steps {
-                withCredentials([usernamePassword(
-                    credentialsId: 'sathya', 
-                    usernameVariable: 'DOCKER_USERNAME', 
-                    passwordVariable: 'DOCKER_PASSWORD'
-                )]) {
-                    sh "echo $DOCKER_PASSWORD | docker login -u $DOCKER_USERNAME --password-stdin"
-
-                    script {
-                        // Push based on branch
-                        if (env.BRANCH_NAME == 'dev') {
-                            sh """
-                                docker tag ${DOCKER_USER}/${IMAGE_NAME}:${IMAGE_TAG} ${DOCKER_USER}/${DEV_REPO}:${IMAGE_TAG}
-                                docker push ${DOCKER_USER}/${DEV_REPO}:${IMAGE_TAG}
-                            """
-                        } else if (env.BRANCH_NAME == 'master') {
-                            sh """
-                                docker tag ${DOCKER_USER}/${IMAGE_NAME}:${IMAGE_TAG} ${DOCKER_USER}/${PROD_REPO}:${IMAGE_TAG}
-                                docker push ${DOCKER_USER}/${PROD_REPO}:${IMAGE_TAG}
-                            """
-                        }
+                    if (env.BRANCH_NAME == "master") {
+                        IMAGE_TAG = "prod"
+                    } else if (env.BRANCH_NAME == "dev") {
+                        IMAGE_TAG = "dev"
                     }
                 }
             }
         }
 
+        stage('Build Docker Image') {
+            steps {
+                sh "docker build -t ${IMAGE_NAME}:${IMAGE_TAG} ."
+            }
+        }
+
+        stage('Docker Login') {
+            steps {
+                withCredentials([usernamePassword(
+                    credentialsId: 'sathya',
+                    usernameVariable: 'DOCKER_USERNAME',
+                    passwordVariable: 'DOCKER_PASSWORD'
+                )]) {
+
+                    sh "echo $DOCKER_PASSWORD | docker login -u $DOCKER_USERNAME --password-stdin"
+
+                }
+            }
+        }
+
+        stage('Push Dev Image') {
+            when {
+                branch 'dev'
+            }
+            steps {
+                sh """
+                docker tag ${IMAGE_NAME}:${IMAGE_TAG} ${DOCKER_USER}/${DEV_REPO}:${IMAGE_TAG}
+                docker push ${DOCKER_USER}/${DEV_REPO}:${IMAGE_TAG}
+                """
+            }
+        }
+
+        stage('Push Prod Image') {
+            when {
+                branch 'master'
+            }
+            steps {
+                sh """
+                docker tag ${IMAGE_NAME}:${IMAGE_TAG} ${DOCKER_USER}/${PROD_REPO}:${IMAGE_TAG}
+                docker push ${DOCKER_USER}/${PROD_REPO}:${IMAGE_TAG}
+                """
+            }
+        }
+
         stage('Deploy to EC2') {
             steps {
-                // Use SSH credentials stored in Jenkins (SSH key)
-                sshagent(['ubuntu']) { 
+                sshagent(['ubuntu']) {
                     sh """
                     ssh -o StrictHostKeyChecking=no ${EC2_USER}@${EC2_IP} '
                         cd /home/${EC2_USER}
-                        ./deploy.sh ${BRANCH}
+                        chmod +x deploy.sh
+                        ./deploy.sh ${IMAGE_TAG}
                     '
                     """
                 }
@@ -73,4 +92,3 @@ pipeline {
         }
     }
 }
-

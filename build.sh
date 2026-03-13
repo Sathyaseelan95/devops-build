@@ -1,23 +1,26 @@
 #!/bin/bash
 set -e
 
-# Branch and Docker info
-BRANCH_NAME=$1  # pass branch as first argument
+BRANCH_NAME=$1
+
 DOCKER_USER=sathyaseelans
-IMAGE_NAME=devops-build
 
 if [ "$BRANCH_NAME" == "dev" ]; then
-    TAG=dev
+    IMAGE="$DOCKER_USER/dev:dev"
+
 elif [ "$BRANCH_NAME" == "master" ]; then
-    TAG=prod
+    IMAGE="$DOCKER_USER/prod:prod"
+
 else
-    TAG=latest
+    IMAGE="$DOCKER_USER/dev:latest"
 fi
 
-echo "Building Docker image for branch $BRANCH_NAME..."
-docker build -t $DOCKER_USER/$IMAGE_NAME:$TAG .
+echo "Building Docker image: $IMAGE"
 
-echo "Pushing Docker image to DockerHub..."
-docker push $DOCKER_USER/$IMAGE_NAME:$TAG
+docker build -t $IMAGE .
 
-echo "Build and push completed for tag: $TAG"
+echo "Pushing Docker image..."
+
+docker push $IMAGE
+
+echo "Build and push completed for $IMAGE"
