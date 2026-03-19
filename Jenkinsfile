@@ -10,7 +10,7 @@ pipeline {
         IMAGE_NAME = "devops-build"
 
         EC2_USER = "ubuntu"
-        EC2_IP   = "13.233.117.152"
+        EC2_IP   = "35.154.36.55"
     }
 
     stages {
