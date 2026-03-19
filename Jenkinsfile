@@ -77,14 +77,21 @@ pipeline {
             }
         }
 
-        stage('Deploy to EC2') {
-            steps {
-                sshagent(['ubuntu']) {
-                    sh """
-                    ssh -o StrictHostKeyChecking=no ${EC2_USER}@${EC2_IP} '
-                        cd /home/${EC2_USER}
-                        chmod +x deploy.sh
-                        ./deploy.sh ${IMAGE_TAG}
+      stage('Deploy to EC2') {
+         steps {
+            sshagent(['ubuntu']) {
+            withCredentials([usernamePassword(
+                credentialsId: 'sathya',
+                usernameVariable: 'DOCKER_USER',
+                passwordVariable: 'DOCKER_PASSWORD'
+            )]) {
+                sh """
+                ssh -o StrictHostKeyChecking=no ${EC2_USER}@${EC2_IP} '
+                    export DOCKER_USER=${DOCKER_USER}
+                    export DOCKER_PASSWORD=${DOCKER_PASSWORD}
+                    cd /home/${EC2_USER}
+                    chmod +x deploy.sh
+                    ./deploy.sh ${IMAGE_TAG}
                     '
                     """
                 }
